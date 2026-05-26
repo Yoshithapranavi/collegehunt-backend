@@ -11,16 +11,16 @@ COPY . .
 RUN rm -rf .git .github node_modules dist || true
 
 # Install dependencies
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --no-optional
 
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client with specific version
+RUN npx prisma@5.7.1 generate
 
 # Build TypeScript
 RUN npm run build
 
-# Remove dev dependencies
-RUN npm install --only=production --legacy-peer-deps
+# Remove dev dependencies  
+RUN rm -rf node_modules && npm install --only=production --legacy-peer-deps --no-optional
 
 # Copy startup script
 COPY start.sh ./
