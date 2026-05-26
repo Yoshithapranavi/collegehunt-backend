@@ -16,8 +16,8 @@ COPY tsconfig*.json ./
 # Build TypeScript
 RUN npm run build
 
-# Remove devDependencies (keep only production)
-RUN npm install --production --legacy-peer-deps --no-optional
+# Remove devDependencies AFTER copying built dist folder
+RUN npm prune --production --legacy-peer-deps
 
 # Copy startup script
 COPY start.sh ./
