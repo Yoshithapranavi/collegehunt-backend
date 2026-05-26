@@ -20,11 +20,13 @@ RUN npm run build
 # Clean install - remove devDependencies after build
 RUN rm -rf node_modules && npm install --only=production --legacy-peer-deps --no-optional
 
-ENV NODE_ENV=production
-
 # Copy startup script
 COPY start.sh ./
 RUN chmod +x ./start.sh
+
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3000
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

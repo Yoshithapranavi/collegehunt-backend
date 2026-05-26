@@ -30,8 +30,17 @@ app.onError((err, c) => {
     return c.json({ error: 'Internal server error' }, 500);
 });
 
-// Start server
+// Graceful shutdown
+const handleShutdown = async (signal: string) => {
+    console.log(`\n${signal} received, closing connections...`);
+    await prisma.$disconnect();
+    process.exit(0);
+};
+
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT', () => handleShutdown('SIGINT'));
+
 const port = parseInt(process.env.PORT || '3000');
-console.log(`🚀 Server starting on http://localhost:${port}`);
+console.log(`Port: ${port}, Environment: ${process.env.NODE_ENV || 'development'}`);
 
 export default app;

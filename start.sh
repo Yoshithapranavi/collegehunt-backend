@@ -2,12 +2,14 @@
 
 echo "🚀 Starting CollegeHunt Backend..."
 
-# Run migrations (non-blocking on failure)
-npx prisma migrate deploy 2>/dev/null || echo "Migrations already applied or skipped"
+# Check if DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ ERROR: DATABASE_URL environment variable not set"
+    exit 1
+fi
 
-# Seed database (non-blocking on failure)
-npx prisma db seed 2>/dev/null || echo "Seeding skipped"
-
-# Start the application
+echo "✅ DATABASE_URL is configured"
 echo "✅ Starting application on port ${PORT:-3000}..."
+
+# Start the application directly (no migrations in production)
 exec node dist/index.js
