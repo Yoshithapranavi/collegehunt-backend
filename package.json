@@ -1,0 +1,42 @@
+{
+    "name": "collegehunt-backend",
+    "version": "1.0.0",
+    "description": "CollegeHunt Backend API - College Discovery Platform",
+    "main": "dist/index.js",
+    "type": "module",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "prisma:generate": "prisma generate",
+        "prisma:migrate": "prisma migrate dev",
+        "prisma:seed": "tsx src/seed.ts",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "eslint src --ext .ts",
+        "type-check": "tsc --noEmit"
+    },
+    "keywords": [
+        "college",
+        "discovery",
+        "career",
+        "platform"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "@prisma/client": "^5.7.1",
+        "hono": "^4.0.11",
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.6",
+        "@typescript-eslint/eslint-plugin": "^6.17.0",
+        "@typescript-eslint/parser": "^6.17.0",
+        "eslint": "^8.56.0",
+        "prisma": "^5.7.1",
+        "tsx": "^4.7.0",
+        "typescript": "^5.3.3",
+        "vitest": "^1.1.0"
+    }
+}

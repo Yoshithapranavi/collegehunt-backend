@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model College {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @unique
+  city               String
+  state              String
+  type               String               // "Government" | "Private" | "Deemed"
+  streams            String[]             // ["Engineering", "Medical", "Commerce"]
+  nirf_rank          Int?
+  established_year   Int?
+  accreditation      String?              // e.g., "A+" or "A"
+  website            String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  // Relations
+  courseFees         CourseFee[]
+  placementStats     PlacementStat[]
+  admissionCutoffs   AdmissionCutoff[]
+  reviews            Review[]
+
+  @@index([city])
+  @@index([type])
+  @@fulltext([name, city]) // For full-text search
+}
+
+model CourseFee {
+  id              Int      @id @default(autoincrement())
+  college_id      Int
+  course          String   // e.g., "B.Tech Computer Science"
+  degree          String   // e.g., "B.Tech", "B.Sc"
+  annual_fee_inr  Int      // In rupees
+  createdAt       DateTime @default(now())
+
+  college         College  @relation(fields: [college_id], references: [id], onDelete: Cascade)
+
+  @@index([college_id])
+  @@unique([college_id, course])
+}
+
+model PlacementStat {
+  id              Int      @id @default(autoincrement())
+  college_id      Int
+  year            Int
+  avg_package     Float    // In lakhs (e.g., 8.5)
+  max_package     Float    // In lakhs
+  placement_pct   Float    // Percentage (0-100)
+  top_recruiters  String[] // Company names
+  createdAt       DateTime @default(now())
+
+  college         College  @relation(fields: [college_id], references: [id], onDelete: Cascade)
+
+  @@index([college_id])
+  @@index([year])
+  @@unique([college_id, year])
+}
+
+model AdmissionCutoff {
+  id              Int      @id @default(autoincrement())
+  college_id      Int
+  exam            String   // "JEE_MAIN" | "CUET" | "STATE"
+  year            Int
+  category        String   // "GENERAL" | "OBC" | "SC" | "ST"
+  cutoff_percentile Float  // Percentile or rank
+  createdAt       DateTime @default(now())
+
+  college         College  @relation(fields: [college_id], references: [id], onDelete: Cascade)
+
+  @@index([college_id])
+  @@index([exam])
+  @@unique([college_id, exam, year, category])
+}
+
+model Review {
+  id              Int      @id @default(autoincrement())
+  college_id      Int
+  author_name     String
+  batch_year      Int
+  stream          String
+  rating_overall  Int      // 1-5
+  rating_placement Int     // 1-5
+  rating_faculty  Int      // 1-5
+  rating_infra    Int      // 1-5
+  body            String   @db.Text
+  status          String   @default("pending") // "pending" | "approved" | "rejected"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  college         College  @relation(fields: [college_id], references: [id], onDelete: Cascade)
+
+  @@index([college_id])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Shortlist {
+  id              String   @id @default(cuid())
+  session_id      String   @unique
+  college_ids     Int[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([session_id])
+}
