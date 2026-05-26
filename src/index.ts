@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { PrismaClient } from '@prisma/client';
+import { createServer } from 'http';
 import { collegeRoutes } from './routes/colleges';
 import { scoreRoutes } from './routes/scoring';
 import { reviewRoutes } from './routes/reviews';
@@ -40,7 +41,31 @@ const handleShutdown = async (signal: string) => {
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 process.on('SIGINT', () => handleShutdown('SIGINT'));
 
+// Start HTTP Server
 const port = parseInt(process.env.PORT || '3000');
-console.log(`Port: ${port}, Environment: ${process.env.NODE_ENV || 'development'}`);
+
+const server = createServer(async (req, res) => {
+    try {
+        const url = new URL(req.url || '/', `http://${req.headers.host}`);
+        const request = new Request(url.toString(), {
+            method: req.method,
+            headers: req.headers as any,
+            body: ['GET', 'HEAD'].includes(req.method || '') ? undefined : req,
+        });
+
+        const response = await app.fetch(request);
+
+        res.writeHead(response.status, Object.fromEntries(response.headers as any));
+        res.end(await response.text());
+    } catch (error) {
+        console.error('Request error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Internal server error' }));
+    }
+});
+
+server.listen(port, '0.0.0.0', () => {
+    console.log(`✅ Server running on port ${port}`);
+});
 
 export default app;
