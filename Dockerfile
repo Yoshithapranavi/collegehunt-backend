@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install OpenSSL (required for Prisma)
+RUN apk add --no-cache openssl
+
 # Copy everything
 COPY . .
 
@@ -11,10 +14,7 @@ RUN rm -rf .git .github node_modules dist || true
 # Install ALL dependencies (including devDependencies for build tools)
 RUN npm install --legacy-peer-deps --no-optional
 
-# Generate Prisma client using local prisma binary (5.7.1)
-RUN ./node_modules/.bin/prisma generate
-
-# Build TypeScript
+# Build TypeScript (skip prisma generate - client already in node_modules)
 RUN npm run build
 
 # Clean install - remove devDependencies after build
