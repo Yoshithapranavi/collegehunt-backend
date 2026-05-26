@@ -2,11 +2,11 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Copy all source files first
+# Copy all files
 COPY . .
 
-# Clean previous builds
-RUN rm -rf dist node_modules
+# Clean previous builds only
+RUN rm -rf dist
 
 # Install dependencies
 RUN npm install --legacy-peer-deps --no-optional
@@ -14,11 +14,9 @@ RUN npm install --legacy-peer-deps --no-optional
 # Build TypeScript
 RUN npm run build
 
-# Verify dist was created
-RUN ls -la dist/routes/
-
-# Keep only production dependencies
-RUN npm prune --production --legacy-peer-deps
+# Verify build succeeded
+RUN test -f dist/index.js || (echo "ERROR: dist/index.js not found" && exit 1)
+RUN test -f dist/routes/colleges.js || (echo "ERROR: dist/routes/colleges.js not found" && exit 1)
 
 # Set production environment
 ENV NODE_ENV=production
