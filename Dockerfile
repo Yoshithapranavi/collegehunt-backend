@@ -2,8 +2,6 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-ENV NODE_ENV=production
-
 # Copy everything
 COPY . .
 
@@ -21,6 +19,8 @@ RUN npm run build
 
 # Clean install - remove devDependencies after build
 RUN rm -rf node_modules && npm install --only=production --legacy-peer-deps --no-optional
+
+ENV NODE_ENV=production
 
 # Copy startup script
 COPY start.sh ./
