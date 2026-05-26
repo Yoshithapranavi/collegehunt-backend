@@ -32,7 +32,6 @@ model College {
 
   @@index([city])
   @@index([type])
-  @@fulltext([name, city]) // For full-text search
 }
 
 model CourseFee {
