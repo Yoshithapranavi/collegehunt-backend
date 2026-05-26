@@ -2,18 +2,12 @@
 
 echo "🚀 Starting CollegeHunt Backend..."
 
-# Generate Prisma client
-echo "📦 Generating Prisma client..."
-npx prisma generate
+# Run migrations (non-blocking on failure)
+npx prisma migrate deploy 2>/dev/null || echo "Migrations already applied or skipped"
 
-# Run migrations
-echo "🗄️ Running database migrations..."
-npx prisma migrate deploy || true
-
-# Seed database if needed
-echo "🌱 Seeding database..."
-npx prisma db seed || true
+# Seed database (non-blocking on failure)
+npx prisma db seed 2>/dev/null || echo "Seeding skipped"
 
 # Start the application
-echo "✅ Starting application..."
-node dist/index.js
+echo "✅ Starting application on port ${PORT:-3000}..."
+exec node dist/index.js
