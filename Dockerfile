@@ -1,24 +1,24 @@
-FROM node:18-alpine
+FROM node:18-slim
 
 WORKDIR /app
 
-# Install OpenSSL (required for Prisma)
-RUN apk add --no-cache openssl
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
 
-# Copy everything
-COPY . .
-
-# Clean up unnecessary files
-RUN rm -rf .git .github node_modules dist || true
-
-# Install ALL dependencies (including devDependencies for build tools)
+# Install all dependencies
 RUN npm install --legacy-peer-deps --no-optional
 
-# Build TypeScript (skip prisma generate - client already in node_modules)
+# Copy source code
+COPY src ./src/
+COPY tsconfig*.json ./
+COPY vite.config.ts ./
+
+# Build TypeScript
 RUN npm run build
 
-# Clean install - remove devDependencies after build
-RUN rm -rf node_modules && npm install --only=production --legacy-peer-deps --no-optional
+# Remove devDependencies (keep only production)
+RUN npm install --production --legacy-peer-deps --no-optional
 
 # Copy startup script
 COPY start.sh ./
@@ -28,9 +28,8 @@ RUN chmod +x ./start.sh
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Create non-root user (Debian-based)
+RUN groupadd -r nodejs && useradd -r -g nodejs nodejs
 
 USER nodejs
 
@@ -42,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 # Start application
-CMD ["sh", "./start.sh"]
+CMD ["node", "dist/index.js"]
