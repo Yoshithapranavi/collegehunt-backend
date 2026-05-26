@@ -1,41 +1,26 @@
-# Build stage
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files and config
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY prisma ./prisma
-
-# Install dependencies
-RUN npm install
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Copy source code
-COPY src ./src
-
-# Build TypeScript
-RUN npm run build
-
-# Production stage
 FROM node:18-alpine
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install only production dependencies
-COPY package*.json ./
+# Copy everything
+COPY . .
 
-RUN npm install --only=production
+# Clean up unnecessary files
+RUN rm -rf .git .github node_modules dist || true
 
-# Copy prisma schema and generated client
-COPY prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/dist ./dist
+# Install dependencies
+RUN npm install --legacy-peer-deps
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build TypeScript
+RUN npm run build
+
+# Remove dev dependencies
+RUN npm install --only=production --legacy-peer-deps
 
 # Copy startup script
 COPY start.sh ./

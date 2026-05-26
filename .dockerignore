@@ -1,16 +1,10 @@
+# Minimal docker ignore - only exclude actual build artifacts and cache
+.git
+.gitignore
 node_modules
 npm-debug.log
 .env
 .env.local
-.git
-.gitignore
-.dockerignore
-DOCKERFILE
-*.test.ts
-vitest.config.ts
-README.md
-DEPLOYMENT.md
-IMPLEMENTATION.md
-PRE_FLIGHT.md
-QUICK_REFERENCE.md
-SETUP.md
+.vscode
+.idea
+
