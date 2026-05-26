@@ -1,4 +1,5 @@
-FROM node:18-slim
+# Stage 1: Build
+FROM node:18-slim as builder
 
 WORKDIR /app
 
@@ -6,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install all dependencies
+# Install all dependencies (including devDependencies)
 RUN npm install --legacy-peer-deps --no-optional
 
 # Copy source code
@@ -16,8 +17,20 @@ COPY tsconfig*.json ./
 # Build TypeScript
 RUN npm run build
 
-# Remove devDependencies AFTER copying built dist folder
-RUN npm prune --production --legacy-peer-deps
+# Stage 2: Production
+FROM node:18-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install only production dependencies
+RUN npm install --production --legacy-peer-deps --no-optional
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
 
 # Copy startup script
 COPY start.sh ./
