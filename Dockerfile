@@ -12,7 +12,6 @@ RUN npm install --legacy-peer-deps --no-optional
 # Copy source code
 COPY src ./src/
 COPY tsconfig*.json ./
-COPY vite.config.ts ./
 
 # Build TypeScript
 RUN npm run build
