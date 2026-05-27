@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { prisma } from '../index';
-import { calculateScore } from '../lib/scoring';
+import { prisma } from '../index.js';
+import { calculateScore } from '../lib/scoring.js';
 
 export const scoreRoutes = new Hono();
 
@@ -33,25 +33,33 @@ scoreRoutes.post('/', async (c) => {
             location: weights.location / totalWeight,
         };
 
-        // Get colleges based on filters
-        const where: any = {};
-        if (filters?.stream) {
-            where.streams = { has: filters.stream };
-        }
-        if (filters?.city) {
-            where.city = { contains: filters.city, mode: 'insensitive' };
-        }
-
-        const colleges = await prisma.college.findMany({
-            where,
+        // Get all colleges
+        const allColleges = await prisma.college.findMany({
             include: {
                 courseFees: true,
                 placementStats: {
                     orderBy: { year: 'desc' },
-                    take: 1,
                 },
             },
         });
+
+        // Apply filters in memory
+        let colleges = allColleges;
+        if (filters?.stream) {
+            colleges = colleges.filter((c) => {
+                try {
+                    const streams = JSON.parse(c.streams || '[]');
+                    return streams.includes(filters.stream);
+                } catch {
+                    return false;
+                }
+            });
+        }
+        if (filters?.city) {
+            colleges = colleges.filter((c) =>
+                c.city.toLowerCase().includes(filters.city?.toLowerCase() || '')
+            );
+        }
 
         // Calculate scores for each college
         const scoredColleges = colleges
@@ -93,11 +101,16 @@ scoreRoutes.post('/shortlist', async (c) => {
 
         const shortlist = await prisma.shortlist.upsert({
             where: { session_id },
-            update: { college_ids, updatedAt: new Date() },
-            create: { session_id, college_ids },
+            update: { college_ids: JSON.stringify(college_ids), updatedAt: new Date() },
+            create: { session_id, college_ids: JSON.stringify(college_ids) },
         });
 
-        return c.json(shortlist);
+        return c.json({
+            session_id: shortlist.session_id,
+            college_ids: JSON.parse(shortlist.college_ids),
+            createdAt: shortlist.createdAt,
+            updatedAt: shortlist.updatedAt,
+        });
     } catch (error) {
         console.error('Error saving shortlist:', error);
         return c.json({ error: 'Failed to save shortlist' }, 500);
@@ -120,9 +133,12 @@ scoreRoutes.get('/shortlist/:session_id', async (c) => {
             );
         }
 
+        // Parse college_ids from JSON string
+        const collegeIds = JSON.parse(shortlist.college_ids || '[]');
+
         // Get full college details
         const colleges = await prisma.college.findMany({
-            where: { id: { in: shortlist.college_ids } },
+            where: { id: { in: collegeIds } },
             include: {
                 placementStats: {
                     orderBy: { year: 'desc' },
@@ -133,7 +149,7 @@ scoreRoutes.get('/shortlist/:session_id', async (c) => {
 
         return c.json({
             session_id,
-            college_ids: shortlist.college_ids,
+            college_ids: collegeIds,
             colleges,
             createdAt: shortlist.createdAt,
             updatedAt: shortlist.updatedAt,

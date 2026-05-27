@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -16,7 +16,7 @@ model College {
   city               String
   state              String
   type               String               // "Government" | "Private" | "Deemed"
-  streams            String[]             // ["Engineering", "Medical", "Commerce"]
+  streams            String               // JSON: ["Engineering", "Medical", "Commerce"]
   nirf_rank          Int?
   established_year   Int?
   accreditation      String?              // e.g., "A+" or "A"
@@ -55,7 +55,7 @@ model PlacementStat {
   avg_package     Float    // In lakhs (e.g., 8.5)
   max_package     Float    // In lakhs
   placement_pct   Float    // Percentage (0-100)
-  top_recruiters  String[] // Company names
+  top_recruiters  String   // JSON: company names
   createdAt       DateTime @default(now())
 
   college         College  @relation(fields: [college_id], references: [id], onDelete: Cascade)
@@ -91,7 +91,7 @@ model Review {
   rating_placement Int     // 1-5
   rating_faculty  Int      // 1-5
   rating_infra    Int      // 1-5
-  body            String   @db.Text
+  body            String
   status          String   @default("pending") // "pending" | "approved" | "rejected"
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -106,7 +106,7 @@ model Review {
 model Shortlist {
   id              String   @id @default(cuid())
   session_id      String   @unique
-  college_ids     Int[]
+  college_ids     String   // JSON: array of IDs
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

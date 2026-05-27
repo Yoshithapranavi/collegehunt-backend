@@ -1,22 +1,22 @@
 import { Hono } from 'hono';
-import { prisma } from '../index';
+import { prisma } from '../index.js';
 
 export const adminRoutes = new Hono();
 
 // Middleware to check admin API key
-const adminAuth = (c: any, next: any) => {
+adminRoutes.use('*', async (c, next) => {
     const apiKey = c.req.header('x-admin-key');
     const expectedKey = process.env.ADMIN_API_KEY;
 
     if (!apiKey || apiKey !== expectedKey) {
-        return c.json({ error: 'Unauthorized' }, 401);
+        return c.json({ error: 'Unauthorized - invalid or missing admin key' }, 401);
     }
 
-    return next();
-};
+    await next();
+});
 
 // POST /api/admin/reviews/:id/approve - Approve a review
-adminRoutes.post('/reviews/:id/approve', adminAuth, async (c) => {
+adminRoutes.post('/reviews/:id/approve', async (c) => {
     try {
         const reviewId = parseInt(c.req.param('id'));
 
@@ -36,7 +36,7 @@ adminRoutes.post('/reviews/:id/approve', adminAuth, async (c) => {
 });
 
 // POST /api/admin/reviews/:id/reject - Reject a review
-adminRoutes.post('/reviews/:id/reject', adminAuth, async (c) => {
+adminRoutes.post('/reviews/:id/reject', async (c) => {
     try {
         const reviewId = parseInt(c.req.param('id'));
         const { reason } = await c.req.json();
@@ -58,7 +58,7 @@ adminRoutes.post('/reviews/:id/reject', adminAuth, async (c) => {
 });
 
 // GET /api/admin/reviews/pending - List pending reviews
-adminRoutes.get('/reviews/pending', adminAuth, async (c) => {
+adminRoutes.get('/reviews/pending', async (c) => {
     try {
         const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100);
         const offset = parseInt(c.req.query('offset') || '0');
@@ -94,7 +94,7 @@ adminRoutes.get('/reviews/pending', adminAuth, async (c) => {
 });
 
 // GET /api/admin/stats - Get admin statistics
-adminRoutes.get('/stats', adminAuth, async (c) => {
+adminRoutes.get('/stats', async (c) => {
     try {
         const totalColleges = await prisma.college.count();
         const totalReviews = await prisma.review.count();

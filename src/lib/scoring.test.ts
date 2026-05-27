@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateScore } from '../lib/scoring';
+import { calculateScore } from '../lib/scoring.js';
 
 describe('Scoring Engine', () => {
     const mockCollege = {

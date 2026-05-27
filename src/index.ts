@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { PrismaClient } from '@prisma/client';
 import { createServer } from 'http';
-import { collegeRoutes } from './routes/colleges';
-import { scoreRoutes } from './routes/scoring';
-import { reviewRoutes } from './routes/reviews';
-import { adminRoutes } from './routes/admin';
+import { collegeRoutes } from './routes/colleges.js';
+import { scoreRoutes } from './routes/scoring.js';
+import { reviewRoutes } from './routes/reviews.js';
+import { adminRoutes } from './routes/admin.js';
 
 const app = new Hono();
 export const prisma = new PrismaClient();
@@ -47,10 +47,22 @@ const port = parseInt(process.env.PORT || '3000');
 const server = createServer(async (req, res) => {
     try {
         const url = new URL(req.url || '/', `http://${req.headers.host}`);
+
+        // Read body if present
+        let body: any;
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method || '')) {
+            body = await new Promise<string>((resolve, reject) => {
+                let data = '';
+                req.on('data', (chunk) => data += chunk);
+                req.on('end', () => resolve(data));
+                req.on('error', reject);
+            });
+        }
+
         const request = new Request(url.toString(), {
             method: req.method,
             headers: req.headers as any,
-            body: ['GET', 'HEAD'].includes(req.method || '') ? undefined : req,
+            body: body || undefined,
         });
 
         const response = await app.fetch(request);

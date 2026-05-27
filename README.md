@@ -2,9 +2,27 @@
 
 Production-ready Node.js + PostgreSQL backend for the CollegeHunt college discovery platform.
 
-**Deployed URL:** [Will be updated after deployment to Railway]
+**Stack:** Hono + TypeScript + Prisma + PostgreSQL
 
-## ⚡ Quick Start (≤3 commands)
+**Deployed URL:** [Will be updated after Railway deployment]
+
+## ⚡ Quick Start (3 commands)
+
+```bash
+# 1. Install & setup
+npm install && cp .env.example .env
+
+# 2. Setup database (make sure PostgreSQL is running)
+npm run prisma:migrate
+
+# 3. Seed database with 25+ real colleges
+npm run prisma:seed
+
+# 4. Start server
+npm run dev
+```
+
+API available at: http://localhost:3000
 
 ### Prerequisites
 - Node.js 18+

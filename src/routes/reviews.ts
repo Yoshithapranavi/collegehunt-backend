@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { prisma } from '../index';
+import { prisma } from '../index.js';
 
 export const reviewRoutes = new Hono();
 

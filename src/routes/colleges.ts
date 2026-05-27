@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { prisma } from '../index';
+import { prisma } from '../index.js';
 
 export const collegeRoutes = new Hono();
 
@@ -19,42 +19,61 @@ type FilterInput = z.infer<typeof FilterSchema>;
 
 // Helper function to get colleges with filters
 async function getCollegesWithFilters(filters: FilterInput) {
-    const where: any = {};
-
-    if (filters.stream) {
-        where.streams = { has: filters.stream };
-    }
-    if (filters.city) {
-        where.city = { contains: filters.city, mode: 'insensitive' };
-    }
-    if (filters.type) {
-        where.type = { contains: filters.type, mode: 'insensitive' };
-    }
-
-    let orderBy: any = { nirf_rank: 'asc' };
-    if (filters.sort === 'placement') {
-        orderBy = { placementStats: { _count: 'desc' } };
-    } else if (filters.sort === 'fees') {
-        orderBy = { courseFees: { _min: { annual_fee_inr: 'asc' } } };
-    } else if (filters.sort === 'name') {
-        orderBy = { name: 'asc' };
-    }
-
-    const colleges = await prisma.college.findMany({
-        where,
-        orderBy,
-        skip: filters.offset,
-        take: filters.limit,
+    // Get all colleges first (SQLite limitation)
+    const allColleges = await prisma.college.findMany({
         include: {
             courseFees: true,
             placementStats: {
                 orderBy: { year: 'desc' },
-                take: 1,
             },
         },
     });
 
-    return colleges;
+    // Apply filters in memory
+    let filtered = allColleges;
+
+    if (filters.city) {
+        filtered = filtered.filter((c) => c.city.toLowerCase().includes(filters.city?.toLowerCase() || ''));
+    }
+
+    if (filters.type) {
+        filtered = filtered.filter((c) => c.type.toLowerCase().includes(filters.type?.toLowerCase() || ''));
+    }
+
+    if (filters.stream) {
+        filtered = filtered.filter((c) => {
+            try {
+                const streams = JSON.parse(c.streams || '[]');
+                return streams.includes(filters.stream);
+            } catch {
+                return false;
+            }
+        });
+    }
+
+    // Sort
+    if (filters.sort === 'rank') {
+        filtered.sort((a, b) => (a.nirf_rank || 999) - (b.nirf_rank || 999));
+    } else if (filters.sort === 'placement') {
+        filtered.sort((a, b) => {
+            const aPlacement = a.placementStats[0]?.avg_package || 0;
+            const bPlacement = b.placementStats[0]?.avg_package || 0;
+            return bPlacement - aPlacement;
+        });
+    } else if (filters.sort === 'fees') {
+        filtered.sort((a, b) => {
+            const aFee = a.courseFees[0]?.annual_fee_inr || 999999;
+            const bFee = b.courseFees[0]?.annual_fee_inr || 999999;
+            return aFee - bFee;
+        });
+    } else if (filters.sort === 'name') {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    // Apply pagination
+    const paginated = filtered.slice(filters.offset, filters.offset + filters.limit);
+
+    return paginated;
 }
 
 // GET /api/colleges - List colleges with filters and search
@@ -71,27 +90,78 @@ collegeRoutes.get('/', async (c) => {
             offset: query.offset ? parseInt(query.offset) : 0,
         });
 
-        // Search by name or city if q parameter provided
-        let colleges = await getCollegesWithFilters(filters);
+        // Get all colleges and apply filters
+        const allColleges = await prisma.college.findMany({
+            include: {
+                courseFees: true,
+                placementStats: {
+                    orderBy: { year: 'desc' },
+                },
+            },
+        });
+
+        // Apply all filters in memory
+        let filtered = allColleges;
+
+        if (filters.city) {
+            filtered = filtered.filter((c) => c.city.toLowerCase().includes(filters.city?.toLowerCase() || ''));
+        }
+
+        if (filters.type) {
+            filtered = filtered.filter((c) => c.type.toLowerCase().includes(filters.type?.toLowerCase() || ''));
+        }
+
+        if (filters.stream) {
+            filtered = filtered.filter((c) => {
+                try {
+                    const streams = JSON.parse(c.streams || '[]');
+                    return streams.includes(filters.stream);
+                } catch {
+                    return false;
+                }
+            });
+        }
 
         if (query.q) {
             const searchTerm = query.q.toLowerCase();
-            colleges = colleges.filter(
-                (college: any) =>
+            filtered = filtered.filter(
+                (college) =>
                     college.name.toLowerCase().includes(searchTerm) ||
                     college.city.toLowerCase().includes(searchTerm)
             );
         }
 
-        // Apply fees filter if provided
-        if (filters.fees_max) {
-            colleges = colleges.filter((college: any) => {
+        if (typeof filters.fees_max !== 'undefined') {
+            filtered = filtered.filter((college) => {
                 const minFee = college.courseFees[0]?.annual_fee_inr || 0;
-                return minFee <= (filters.fees_max || 0);
+                return minFee <= (filters.fees_max as number);
             });
         }
 
-        const total = await prisma.college.count({ where: {} });
+        // Sort
+        if (filters.sort === 'rank') {
+            filtered.sort((a, b) => (a.nirf_rank || 999) - (b.nirf_rank || 999));
+        } else if (filters.sort === 'placement') {
+            filtered.sort((a, b) => {
+                const aPlacement = a.placementStats[0]?.avg_package || 0;
+                const bPlacement = b.placementStats[0]?.avg_package || 0;
+                return bPlacement - aPlacement;
+            });
+        } else if (filters.sort === 'fees') {
+            filtered.sort((a, b) => {
+                const aFee = a.courseFees[0]?.annual_fee_inr || 999999;
+                const bFee = b.courseFees[0]?.annual_fee_inr || 999999;
+                return aFee - bFee;
+            });
+        } else if (filters.sort === 'name') {
+            filtered.sort((a, b) => a.name.localeCompare(b.name));
+        }
+
+        // Get total before pagination
+        const total = filtered.length;
+
+        // Apply pagination
+        const colleges = filtered.slice(filters.offset, filters.offset + filters.limit);
 
         return c.json({
             data: colleges,

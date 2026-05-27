@@ -1,32 +1,27 @@
-FROM node:18-slim
+FROM node:18-slim AS builder
 
 WORKDIR /app
 
-# Copy all files
-COPY . .
-
-# Clean previous builds only
-RUN rm -rf dist
-
-# Install dependencies
+COPY package*.json ./
+COPY prisma ./prisma
 RUN npm install --legacy-peer-deps --no-optional
+RUN npx prisma generate
 
-# Build TypeScript
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
 
-# Verify build succeeded
-RUN test -f dist/index.js || (echo "ERROR: dist/index.js not found" && exit 1)
-RUN test -f dist/routes/colleges.js || (echo "ERROR: dist/routes/colleges.js not found" && exit 1)
+FROM node:18-slim AS runner
 
-# Set production environment
+WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Create non-root user
-RUN groupadd -r nodejs && useradd -r -g nodejs nodejs
-USER nodejs
+COPY package*.json ./
+COPY prisma ./prisma
+RUN npm install --omit=dev --legacy-peer-deps --no-optional && npx prisma generate
+
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
-
-# Start application directly
 CMD ["node", "dist/index.js"]
