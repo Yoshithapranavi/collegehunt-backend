@@ -32,31 +32,20 @@ app.get('/openapi.json', (c) => c.json(buildOpenApiSpec()));
 
 app.get('/docs', (c) => {
     return c.html(`
-                <!doctype html>
-                <html>
-                    <head>
-                        <meta charset="utf-8" />
-                        <meta name="viewport" content="width=device-width, initial-scale=1" />
-                        <title>CollegeHunt API Docs</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; padding: 24px; line-height: 1.5; }
-                            code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
-                            a { color: #0b57d0; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>CollegeHunt Backend API</h1>
-                        <p>OpenAPI spec: <a href="/openapi.json">/openapi.json</a></p>
-                        <ul>
-                            <li><code>/colleges</code> and <code>/api/colleges</code></li>
-                            <li><code>/score</code> and <code>/api/score</code></li>
-                            <li><code>/colleges/:id/reviews</code></li>
-                            <li><code>/colleges/:id/predictor</code></li>
-                            <li><code>/colleges/:id/career-trends</code></li>
-                            <li><code>/admin/*</code> and <code>/api/admin/*</code></li>
-                        </ul>
-                    </body>
-                </html>
+            <!doctype html>
+            <html>
+                <head>
+                    <meta charset="utf-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1" />
+                    <title>CollegeHunt API Docs</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+                    <style>body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0; height:100vh; }</style>
+                </head>
+                <body>
+                    <redoc spec-url="/openapi.json"></redoc>
+                    <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+                </body>
+            </html>
         `);
 });
 
