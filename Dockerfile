@@ -2,6 +2,8 @@ FROM node:18-slim AS builder
 
 WORKDIR /app
 
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm install --legacy-peer-deps --no-optional
@@ -16,6 +18,8 @@ FROM node:18-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 COPY prisma ./prisma
