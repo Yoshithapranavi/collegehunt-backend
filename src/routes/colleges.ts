@@ -113,11 +113,11 @@ collegeRoutes.get('/', async (c) => {
         const where: any = {};
 
         if (filters.city) {
-            where.city = { contains: filters.city, mode: 'insensitive' } as any;
+            where.city = { contains: filters.city } as any;
         }
 
         if (filters.type) {
-            where.type = { contains: filters.type, mode: 'insensitive' } as any;
+            where.type = { contains: filters.type } as any;
         }
 
         if (filters.stream) {
@@ -128,8 +128,8 @@ collegeRoutes.get('/', async (c) => {
         if (query.q) {
             const q = String(query.q);
             where.OR = [
-                { name: { contains: q, mode: 'insensitive' } as any },
-                { city: { contains: q, mode: 'insensitive' } as any },
+                { name: { contains: q } as any },
+                { city: { contains: q } as any },
             ];
         }
 
