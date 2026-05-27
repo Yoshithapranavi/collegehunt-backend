@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { getCareerTrends } from '../lib/career.js';
 
 export const collegeRoutes = new Hono();
 
@@ -16,6 +17,31 @@ const FilterSchema = z.object({
 });
 
 type FilterInput = z.infer<typeof FilterSchema>;
+
+function parseStreams(streams: string) {
+    try {
+        return JSON.parse(streams || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function buildComparison(colleges: any[]) {
+    return {
+        count: colleges.length,
+        merged: colleges.map((college) => ({
+            id: college.id,
+            name: college.name,
+            city: college.city,
+            state: college.state,
+            type: college.type,
+            nirf_rank: college.nirf_rank,
+            latest_fee: college.courseFees?.[0]?.annual_fee_inr ?? null,
+            latest_placement: college.placementStats?.[0] ?? null,
+            admission_cutoffs: college.admissionCutoffs || [],
+        })),
+    };
+}
 
 // Helper function to get colleges with filters
 async function getCollegesWithFilters(filters: FilterInput) {
@@ -41,14 +67,7 @@ async function getCollegesWithFilters(filters: FilterInput) {
     }
 
     if (filters.stream) {
-        filtered = filtered.filter((c) => {
-            try {
-                const streams = JSON.parse(c.streams || '[]');
-                return streams.includes(filters.stream);
-            } catch {
-                return false;
-            }
-        });
+        filtered = filtered.filter((c) => parseStreams(c.streams).includes(filters.stream));
     }
 
     // Sort
@@ -112,14 +131,7 @@ collegeRoutes.get('/', async (c) => {
         }
 
         if (filters.stream) {
-            filtered = filtered.filter((c) => {
-                try {
-                    const streams = JSON.parse(c.streams || '[]');
-                    return streams.includes(filters.stream);
-                } catch {
-                    return false;
-                }
-            });
+            filtered = filtered.filter((c) => parseStreams(c.streams).includes(filters.stream));
         }
 
         if (query.q) {
@@ -177,58 +189,6 @@ collegeRoutes.get('/', async (c) => {
     }
 });
 
-// GET /api/colleges/:id - Get college detail with all relations
-collegeRoutes.get('/:id', async (c) => {
-    try {
-        const id = parseInt(c.req.param('id'));
-
-        const college = await prisma.college.findUnique({
-            where: { id },
-            include: {
-                courseFees: true,
-                placementStats: {
-                    orderBy: { year: 'desc' },
-                },
-                admissionCutoffs: {
-                    orderBy: { year: 'desc' },
-                },
-                reviews: {
-                    where: { status: 'approved' },
-                    orderBy: { createdAt: 'desc' },
-                    take: 5,
-                },
-            },
-        });
-
-        if (!college) {
-            return c.json({ error: 'College not found' }, 404);
-        }
-
-        // Calculate review aggregates
-        const allReviews = await prisma.review.findMany({
-            where: { college_id: id, status: 'approved' },
-        });
-
-        const reviewAggregates = {
-            total: allReviews.length,
-            avg_rating: allReviews.length > 0
-                ? (allReviews.reduce((sum: number, r: any) => sum + r.rating_overall, 0) / allReviews.length).toFixed(1)
-                : null,
-            avg_placement_rating: allReviews.length > 0
-                ? (allReviews.reduce((sum: number, r: any) => sum + r.rating_placement, 0) / allReviews.length).toFixed(1)
-                : null,
-        };
-
-        return c.json({
-            ...college,
-            reviewAggregates,
-        });
-    } catch (error) {
-        console.error('Error fetching college:', error);
-        return c.json({ error: 'Failed to fetch college' }, 500);
-    }
-});
-
 // POST /api/colleges/compare - Compare multiple colleges
 collegeRoutes.post('/compare', async (c) => {
     try {
@@ -253,10 +213,42 @@ collegeRoutes.post('/compare', async (c) => {
 
         return c.json({
             colleges,
-            comparison: {
-                count: colleges.length,
-                dimensions: ['fees', 'placement', 'rank', 'location'],
+            comparison: buildComparison(colleges),
+        });
+    } catch (error) {
+        console.error('Error comparing colleges:', error);
+        return c.json({ error: 'Failed to compare colleges' }, 500);
+    }
+});
+
+// GET /api/colleges/compare?ids=1,2,3 - Compare multiple colleges
+collegeRoutes.get('/compare', async (c) => {
+    try {
+        const idsParam = c.req.query('ids') || '';
+        const ids = idsParam
+            .split(',')
+            .map((id) => parseInt(id.trim()))
+            .filter((id) => !Number.isNaN(id));
+
+        if (ids.length < 2) {
+            return c.json({ error: 'Provide at least 2 college IDs' }, 400);
+        }
+
+        const colleges = await prisma.college.findMany({
+            where: { id: { in: ids } },
+            include: {
+                courseFees: true,
+                placementStats: { orderBy: { year: 'desc' }, take: 1 },
+                admissionCutoffs: { orderBy: { year: 'desc' }, take: 3 },
             },
+        });
+
+        if (colleges.length === 0) {
+            return c.json({ error: 'No colleges found' }, 404);
+        }
+
+        return c.json({
+            comparison: buildComparison(colleges),
         });
     } catch (error) {
         console.error('Error comparing colleges:', error);
@@ -319,5 +311,83 @@ collegeRoutes.get('/:id/predictor', async (c) => {
     } catch (error) {
         console.error('Error calculating probability:', error);
         return c.json({ error: 'Failed to calculate probability' }, 500);
+    }
+});
+
+// GET /api/colleges/:id/career-trends - Career outcome enrichment
+collegeRoutes.get('/:id/career-trends', async (c) => {
+    try {
+        const id = parseInt(c.req.param('id'));
+
+        const college = await prisma.college.findUnique({
+            where: { id },
+            include: {
+                placementStats: {
+                    orderBy: { year: 'desc' },
+                    take: 1,
+                },
+            },
+        });
+
+        if (!college) {
+            return c.json({ error: 'College not found' }, 404);
+        }
+
+        return c.json(getCareerTrends(college));
+    } catch (error) {
+        console.error('Error fetching career trends:', error);
+        return c.json({ error: 'Failed to fetch career trends' }, 500);
+    }
+});
+
+// GET /api/colleges/:id - Get college detail with all relations
+collegeRoutes.get('/:id', async (c) => {
+    try {
+        const id = parseInt(c.req.param('id'));
+
+        const college = await prisma.college.findUnique({
+            where: { id },
+            include: {
+                courseFees: true,
+                placementStats: {
+                    orderBy: { year: 'desc' },
+                },
+                admissionCutoffs: {
+                    orderBy: { year: 'desc' },
+                },
+                reviews: {
+                    where: { status: 'approved' },
+                    orderBy: { createdAt: 'desc' },
+                    take: 5,
+                },
+            },
+        });
+
+        if (!college) {
+            return c.json({ error: 'College not found' }, 404);
+        }
+
+        // Calculate review aggregates
+        const allReviews = await prisma.review.findMany({
+            where: { college_id: id, status: 'approved' },
+        });
+
+        const reviewAggregates = {
+            total: allReviews.length,
+            avg_rating: allReviews.length > 0
+                ? (allReviews.reduce((sum: number, r: any) => sum + r.rating_overall, 0) / allReviews.length).toFixed(1)
+                : null,
+            avg_placement_rating: allReviews.length > 0
+                ? (allReviews.reduce((sum: number, r: any) => sum + r.rating_placement, 0) / allReviews.length).toFixed(1)
+                : null,
+        };
+
+        return c.json({
+            ...college,
+            reviewAggregates,
+        });
+    } catch (error) {
+        console.error('Error fetching college:', error);
+        return c.json({ error: 'Failed to fetch college' }, 500);
     }
 });

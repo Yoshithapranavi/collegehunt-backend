@@ -17,8 +17,7 @@ const ReviewSchema = z.object({
 
 type ReviewInput = z.infer<typeof ReviewSchema>;
 
-// POST /api/reviews/:college_id/create - Submit a review
-reviewRoutes.post('/:college_id/create', async (c) => {
+async function createReviewHandler(c: any) {
     try {
         const collegeId = parseInt(c.req.param('college_id'));
         const body = await c.req.json();
@@ -59,10 +58,15 @@ reviewRoutes.post('/:college_id/create', async (c) => {
         console.error('Error creating review:', error);
         return c.json({ error: 'Failed to create review' }, 500);
     }
-});
+}
 
-// GET /api/reviews/:college_id - Get approved reviews with pagination
-reviewRoutes.get('/:college_id', async (c) => {
+// POST /colleges/:college_id/reviews - Submit a review
+reviewRoutes.post('/:college_id/reviews', createReviewHandler);
+
+// Legacy alias
+reviewRoutes.post('/:college_id/create', createReviewHandler);
+
+async function listReviewsHandler(c: any) {
     try {
         const collegeId = parseInt(c.req.param('college_id'));
         const limit = Math.min(parseInt(c.req.query('limit') || '10'), 50);
@@ -136,4 +140,10 @@ reviewRoutes.get('/:college_id', async (c) => {
         console.error('Error fetching reviews:', error);
         return c.json({ error: 'Failed to fetch reviews' }, 500);
     }
-});
+}
+
+// GET /colleges/:college_id/reviews - Get approved reviews with pagination
+reviewRoutes.get('/:college_id/reviews', listReviewsHandler);
+
+// Legacy alias
+reviewRoutes.get('/:college_id', listReviewsHandler);

@@ -2,6 +2,80 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+function parseStreams(streams: string) {
+    try {
+        return JSON.parse(streams || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function getPrimaryStream(collegeData: any) {
+    const streams = parseStreams(collegeData.streams);
+    return streams[0] || 'Engineering';
+}
+
+function buildCourseFees(collegeData: any) {
+    const primaryStream = getPrimaryStream(collegeData);
+    const government = collegeData.type === 'Government';
+    const baseFee = government ? 18000 : 125000;
+
+    if (primaryStream === 'Engineering') {
+        return [
+            { course: 'B.Tech Computer Science', degree: 'B.Tech', annual_fee_inr: baseFee },
+            { course: 'B.Tech Electronics', degree: 'B.Tech', annual_fee_inr: Math.round(baseFee * 1.1) },
+        ];
+    }
+
+    if (primaryStream === 'Commerce') {
+        return [
+            { course: 'B.Com Honours', degree: 'B.Com', annual_fee_inr: Math.round(baseFee * 0.8) },
+            { course: 'BBA', degree: 'BBA', annual_fee_inr: Math.round(baseFee * 1.05) },
+        ];
+    }
+
+    if (primaryStream === 'Law') {
+        return [
+            { course: 'BA LLB', degree: 'LLB', annual_fee_inr: Math.round(baseFee * 0.9) },
+        ];
+    }
+
+    if (primaryStream === 'Management') {
+        return [
+            { course: 'MBA', degree: 'MBA', annual_fee_inr: Math.round(baseFee * 1.6) },
+            { course: 'PGDM', degree: 'PGDM', annual_fee_inr: Math.round(baseFee * 1.7) },
+        ];
+    }
+
+    return [
+        { course: 'General Programme', degree: 'UG', annual_fee_inr: baseFee },
+        { course: 'Honours Programme', degree: 'UG', annual_fee_inr: Math.round(baseFee * 1.15) },
+    ];
+}
+
+function buildAdmissionCutoffs(collegeData: any) {
+    const primaryStream = getPrimaryStream(collegeData);
+    const exam = primaryStream === 'Law' ? 'CLAT' : primaryStream === 'Commerce' || primaryStream === 'Management' || primaryStream === 'Science' ? 'CUET' : 'JEE_MAIN';
+    const base = collegeData.type === 'Government' ? 96 : 89;
+    const rankBonus = collegeData.nirf_rank ? Math.max(0, 10 - Math.floor(collegeData.nirf_rank / 10)) : 0;
+    const baseCutoff = Math.min(99.5, base + rankBonus);
+    const categories = [
+        { category: 'GENERAL', delta: 0 },
+        { category: 'OBC', delta: -2.5 },
+        { category: 'SC', delta: -5 },
+        { category: 'ST', delta: -7 },
+    ];
+
+    return [2024, 2023, 2022].flatMap((year, index) =>
+        categories.map(({ category, delta }) => ({
+            exam,
+            year,
+            category,
+            cutoff_percentile: Math.max(55, Math.min(99.8, Number((baseCutoff - index * 0.7 + delta).toFixed(1)))),
+        }))
+    );
+}
+
 const collegesData = [
     {
         name: 'Indian Institute of Technology Delhi',
@@ -457,6 +531,72 @@ const collegesData = [
             },
         ],
     },
+    {
+        name: 'Indian Institute of Management Ahmedabad',
+        city: 'Ahmedabad',
+        state: 'Gujarat',
+        type: 'Government',
+        streams: JSON.stringify(['Management']),
+        nirf_rank: 1,
+        established_year: 1961,
+        accreditation: 'A++',
+        website: 'iima.ac.in',
+        placementStats: [
+            {
+                year: 2024,
+                avg_package: 34.5,
+                max_package: 115.0,
+                placement_pct: 100.0,
+                top_recruiters: JSON.stringify(['McKinsey', 'Bain', 'Goldman Sachs', 'Amazon']),
+            },
+        ],
+        reviews: [
+            {
+                author_name: 'Aman Shah',
+                batch_year: 2022,
+                stream: 'Management',
+                rating_overall: 5,
+                rating_placement: 5,
+                rating_faculty: 5,
+                rating_infra: 5,
+                body: 'IIMA offers world-class management education with elite placements, case studies, and unmatched peer learning.',
+                status: 'approved',
+            },
+        ],
+    },
+    {
+        name: 'Miranda House',
+        city: 'Delhi',
+        state: 'Delhi',
+        type: 'Government',
+        streams: JSON.stringify(['Commerce', 'Science']),
+        nirf_rank: 10,
+        established_year: 1948,
+        accreditation: 'A++',
+        website: 'mirandahouse.ac.in',
+        placementStats: [
+            {
+                year: 2024,
+                avg_package: 8.0,
+                max_package: 25.0,
+                placement_pct: 90.0,
+                top_recruiters: JSON.stringify(['Deloitte', 'Accenture', 'HDFC Bank']),
+            },
+        ],
+        reviews: [
+            {
+                author_name: 'Nisha Verma',
+                batch_year: 2023,
+                stream: 'Commerce',
+                rating_overall: 5,
+                rating_placement: 4,
+                rating_faculty: 5,
+                rating_infra: 4,
+                body: 'Miranda House has a strong academic culture, experienced faculty, and excellent opportunities in Delhi University.',
+                status: 'approved',
+            },
+        ],
+    },
 ];
 
 async function seedColleges() {
@@ -479,6 +619,12 @@ async function seedColleges() {
             const college = await prisma.college.create({
                 data: {
                     ...collegeInput,
+                    courseFees: {
+                        create: buildCourseFees(collegeData),
+                    },
+                    admissionCutoffs: {
+                        create: buildAdmissionCutoffs(collegeData),
+                    },
                     placementStats: {
                         create: placementStats,
                     },

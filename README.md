@@ -1,10 +1,10 @@
 # CollegeHunt Backend API
 
-Production-ready Node.js + PostgreSQL backend for the CollegeHunt college discovery platform.
+Production-ready Node.js + Prisma backend for the CollegeHunt college discovery platform.
 
-**Stack:** Hono + TypeScript + Prisma + PostgreSQL
+**Stack:** Hono + TypeScript + Prisma
 
-**Deployed URL:** [Will be updated after Railway deployment]
+**Deployed URL:** https://collegehunt-backend-production.up.railway.app
 
 ## ⚡ Quick Start (3 commands)
 
@@ -12,7 +12,7 @@ Production-ready Node.js + PostgreSQL backend for the CollegeHunt college discov
 # 1. Install & setup
 npm install && cp .env.example .env
 
-# 2. Setup database (make sure PostgreSQL is running)
+# 2. Setup database
 npm run prisma:migrate
 
 # 3. Seed database with 25+ real colleges
@@ -26,7 +26,6 @@ API available at: http://localhost:3000
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL 14+
 - npm or yarn
 
 ### Setup
@@ -37,7 +36,7 @@ npm install
 
 # 2. Set up environment
 cp .env.example .env
-# Edit .env with your PostgreSQL connection string
+# Edit .env with the local DATABASE_URL from the example file
 
 # 3. Run migrations and seed database
 npm run prisma:migrate
@@ -106,17 +105,19 @@ Returns full college profile with placement trends, reviews, and admission cutof
 
 #### Compare Colleges
 ```bash
-POST /api/colleges/compare
+GET /colleges/compare?ids=1,2,3
+GET /api/colleges/compare?ids=1,2,3
 Content-Type: application/json
-
-{
-  "ids": [1, 2, 3]
-}
 ```
 
 #### Admission Probability Predictor
 ```bash
 GET /api/colleges/:id/predictor?exam=JEE_MAIN&percentile=92&category=GENERAL
+```
+
+#### Career Trends Bonus
+```bash
+GET /colleges/:id/career-trends
 ```
 
 **Response:**
@@ -198,7 +199,7 @@ GET /api/score/shortlist/:session_id
 
 #### Submit Review
 ```bash
-POST /api/reviews/:college_id/create
+POST /colleges/:college_id/reviews
 Content-Type: application/json
 
 {
@@ -220,8 +221,10 @@ Content-Type: application/json
 
 #### Get Reviews
 ```bash
-GET /api/reviews/:college_id?limit=10&offset=0
+GET /colleges/:college_id/reviews?limit=10&offset=0
 ```
+
+Legacy review endpoints are still available under `/api/reviews/:college_id/create` and `/api/reviews/:college_id`.
 
 Only approved reviews are returned.
 
@@ -427,7 +430,7 @@ npx prisma migrate reset
 
 **Search colleges:**
 ```bash
-curl "http://localhost:3000/api/colleges?q=IIT&stream=Engineering"
+curl "http://localhost:3000/colleges?q=IIT&stream=Engineering"
 ```
 
 **Calculate scores:**
@@ -442,7 +445,7 @@ curl -X POST "http://localhost:3000/api/score" \
 
 **Submit review:**
 ```bash
-curl -X POST "http://localhost:3000/api/reviews/1/create" \
+curl -X POST "http://localhost:3000/colleges/1/reviews" \
   -H "Content-Type: application/json" \
   -d '{
     "author_name": "Student Name",
@@ -461,6 +464,12 @@ curl -X POST "http://localhost:3000/api/reviews/1/create" \
 curl -X POST "http://localhost:3000/api/admin/reviews/1/approve" \
   -H "x-admin-key: your-secure-admin-key"
 ```
+
+## 🌐 Public Endpoints
+
+- [Live root](https://collegehunt-backend-production.up.railway.app)
+- [Health check](https://collegehunt-backend-production.up.railway.app/health)
+- [OpenAPI spec](https://collegehunt-backend-production.up.railway.app/openapi.json)
 
 ---
 

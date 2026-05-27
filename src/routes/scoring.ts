@@ -5,6 +5,11 @@ import { calculateScore } from '../lib/scoring.js';
 
 export const scoreRoutes = new Hono();
 
+const scoreCache = new Map<string, { timestamp: number; payload: any }>();
+const rateLimitWindowMs = 60_000;
+const maxScoreRequestsPerWindow = 30;
+const scoreRateLimit = new Map<string, { count: number; resetAt: number }>();
+
 const ScoreRequestSchema = z.object({
     weights: z.object({
         placement: z.number().min(0).max(1),
@@ -19,11 +24,58 @@ const ScoreRequestSchema = z.object({
 
 type ScoreRequest = z.infer<typeof ScoreRequestSchema>;
 
+function getClientIp(c: any) {
+    const forwarded = c.req.header('x-forwarded-for');
+    if (forwarded) return forwarded.split(',')[0].trim();
+    return c.req.header('x-real-ip') || c.req.header('cf-connecting-ip') || 'unknown';
+}
+
+function getScoreCacheKey(body: ScoreRequest) {
+    return JSON.stringify(body);
+}
+
+function checkRateLimit(ip: string) {
+    const now = Date.now();
+    const current = scoreRateLimit.get(ip);
+
+    if (!current || current.resetAt <= now) {
+        scoreRateLimit.set(ip, { count: 1, resetAt: now + rateLimitWindowMs });
+        return { allowed: true };
+    }
+
+    if (current.count >= maxScoreRequestsPerWindow) {
+        return {
+            allowed: false,
+            retryAfterSeconds: Math.ceil((current.resetAt - now) / 1000),
+        };
+    }
+
+    current.count += 1;
+    scoreRateLimit.set(ip, current);
+    return { allowed: true };
+}
+
 // POST /api/score - Calculate weighted college scores
 scoreRoutes.post('/', async (c) => {
     try {
         const body = await c.req.json();
         const { weights, filters } = ScoreRequestSchema.parse(body);
+        const clientIp = getClientIp(c);
+
+        const rateLimitResult = checkRateLimit(clientIp);
+        if (!rateLimitResult.allowed) {
+            return c.json(
+                { error: 'Rate limit exceeded for /score' },
+                429,
+                { 'Retry-After': String(rateLimitResult.retryAfterSeconds || 60) }
+            );
+        }
+
+        const cacheKey = getScoreCacheKey({ weights, filters });
+        const cached = scoreCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < 5 * 60_000) {
+            return c.json({ ...cached.payload, cached: true });
+        }
 
         // Normalize weights to sum to 1
         const totalWeight = weights.placement + weights.fees + weights.location;
@@ -76,11 +128,20 @@ scoreRoutes.post('/', async (c) => {
             })
             .sort((a: any, b: any) => b.overall_score - a.overall_score);
 
-        return c.json({
+        const payload = {
             weights: normalizedWeights,
             colleges: scoredColleges,
             timestamp: new Date().toISOString(),
-        });
+        };
+
+        scoreCache.set(cacheKey, { timestamp: Date.now(), payload });
+
+        if (scoreCache.size > 100) {
+            const oldestKey = scoreCache.keys().next().value;
+            if (oldestKey) scoreCache.delete(oldestKey);
+        }
+
+        return c.json(payload);
     } catch (error) {
         console.error('Error calculating scores:', error);
         return c.json({ error: 'Failed to calculate scores' }, 500);
