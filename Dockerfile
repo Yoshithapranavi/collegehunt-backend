@@ -14,9 +14,6 @@ RUN npx prisma generate
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
-RUN rm -f dev.db
-RUN npx prisma db push
-RUN npm run prisma:seed
 
 FROM node:18-slim AS runner
 
@@ -32,7 +29,6 @@ COPY prisma ./prisma
 RUN npm install --omit=dev --legacy-peer-deps --no-optional && npx prisma generate
 
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/dev.db ./dev.db
 
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx prisma db push && node dist/seed.js && node dist/index.js"]

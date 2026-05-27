@@ -461,6 +461,15 @@ const collegesData = [
 
 async function seedColleges() {
     console.log('Starting seed...');
+    console.log('Clearing existing data...');
+
+    await prisma.shortlist.deleteMany();
+    await prisma.review.deleteMany();
+    await prisma.placementStat.deleteMany();
+    await prisma.courseFee.deleteMany();
+    await prisma.admissionCutoff.deleteMany();
+    await prisma.college.deleteMany();
+
     let createdCount = 0;
 
     for (const collegeData of collegesData) {
