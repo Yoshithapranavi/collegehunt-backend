@@ -1,7 +1,6 @@
 FROM node:18-slim AS builder
 
 WORKDIR /app
-ENV NODE_ENV=production
 ENV PORT=3000
 ENV DATABASE_URL=file:./dev.db
 
