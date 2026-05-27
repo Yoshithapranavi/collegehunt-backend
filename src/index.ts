@@ -9,6 +9,16 @@ import { adminRoutes } from './routes/admin.js';
 const app = new Hono();
 export const prisma = new PrismaClient();
 
+// Root endpoint for browser checks
+app.get('/', (c) => {
+    return c.json({
+        status: 'ok',
+        service: 'CollegeHunt backend',
+        message: 'Backend is running. Use /health or /api/* endpoints.',
+        endpoints: ['/health', '/api/colleges', '/api/score', '/api/reviews', '/api/admin'],
+    });
+});
+
 // Health check
 app.get('/health', (c) => {
     return c.json({ status: 'ok', timestamp: new Date().toISOString() });
