@@ -22,11 +22,11 @@ jobs:
           node-version: '18'
 
       - name: Install frontend dependencies
-        working-directory: ../frontend
+        working-directory: frontend
         run: npm ci
 
       - name: Build frontend
-        working-directory: ../frontend
+        working-directory: frontend
         env:
           VITE_API_BASE: https://collegehunt-backend-production.up.railway.app
         run: npm run build
@@ -34,7 +34,7 @@ jobs:
       - name: Upload artifact for GitHub Pages
         uses: actions/upload-pages-artifact@v1
         with:
-          path: ../frontend/dist
+          path: frontend/dist
 
   deploy:
     needs: build-and-deploy
