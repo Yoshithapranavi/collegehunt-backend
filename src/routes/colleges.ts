@@ -109,79 +109,70 @@ collegeRoutes.get('/', async (c) => {
             offset: query.offset ? parseInt(query.offset) : 0,
         });
 
-        // Get all colleges and apply filters
-        const allColleges = await prisma.college.findMany({
-            include: {
-                courseFees: true,
-                placementStats: {
-                    orderBy: { year: 'desc' },
-                },
-            },
-        });
-
-        // Apply all filters in memory
-        let filtered = allColleges;
+        // Build a Prisma where clause to push filtering into the DB when possible
+        const where: any = {};
 
         if (filters.city) {
-            filtered = filtered.filter((c) => c.city.toLowerCase().includes(filters.city?.toLowerCase() || ''));
+            where.city = { contains: filters.city, mode: 'insensitive' } as any;
         }
 
         if (filters.type) {
-            filtered = filtered.filter((c) => c.type.toLowerCase().includes(filters.type?.toLowerCase() || ''));
+            where.type = { contains: filters.type, mode: 'insensitive' } as any;
         }
 
         if (filters.stream) {
-            filtered = filtered.filter((c) => parseStreams(c.streams).includes(filters.stream));
+            // streams is stored as JSON text like '["Engineering"]' — check for substring
+            where.streams = { contains: filters.stream } as any;
         }
 
         if (query.q) {
-            const searchTerm = query.q.toLowerCase();
-            filtered = filtered.filter(
-                (college) =>
-                    college.name.toLowerCase().includes(searchTerm) ||
-                    college.city.toLowerCase().includes(searchTerm)
-            );
+            const q = String(query.q);
+            where.OR = [
+                { name: { contains: q, mode: 'insensitive' } as any },
+                { city: { contains: q, mode: 'insensitive' } as any },
+            ];
         }
 
         if (typeof filters.fees_max !== 'undefined') {
-            filtered = filtered.filter((college) => {
-                const minFee = college.courseFees[0]?.annual_fee_inr || 0;
-                return minFee <= (filters.fees_max as number);
-            });
+            where.courseFees = { some: { annual_fee_inr: { lte: filters.fees_max } } } as any;
         }
 
-        // Sort
+        // Fetch from DB with relations; keep sorting by more complex metrics in memory
+        const dbColleges = await prisma.college.findMany({
+            where,
+            include: {
+                courseFees: true,
+                placementStats: { orderBy: { year: 'desc' } },
+            },
+        });
+
+        // Sort in memory for placement/name/fees/rank options
+        let results = dbColleges;
+
         if (filters.sort === 'rank') {
-            filtered.sort((a, b) => (a.nirf_rank || 999) - (b.nirf_rank || 999));
+            results.sort((a, b) => (a.nirf_rank || 999) - (b.nirf_rank || 999));
         } else if (filters.sort === 'placement') {
-            filtered.sort((a, b) => {
+            results.sort((a, b) => {
                 const aPlacement = a.placementStats[0]?.avg_package || 0;
                 const bPlacement = b.placementStats[0]?.avg_package || 0;
                 return bPlacement - aPlacement;
             });
         } else if (filters.sort === 'fees') {
-            filtered.sort((a, b) => {
+            results.sort((a, b) => {
                 const aFee = a.courseFees[0]?.annual_fee_inr || 999999;
                 const bFee = b.courseFees[0]?.annual_fee_inr || 999999;
                 return aFee - bFee;
             });
         } else if (filters.sort === 'name') {
-            filtered.sort((a, b) => a.name.localeCompare(b.name));
+            results.sort((a, b) => a.name.localeCompare(b.name));
         }
 
-        // Get total before pagination
-        const total = filtered.length;
-
-        // Apply pagination
-        const colleges = filtered.slice(filters.offset, filters.offset + filters.limit);
+        const total = results.length;
+        const colleges = results.slice(filters.offset, filters.offset + filters.limit);
 
         return c.json({
             data: colleges,
-            pagination: {
-                limit: filters.limit,
-                offset: filters.offset,
-                total,
-            },
+            pagination: { limit: filters.limit, offset: filters.offset, total },
         });
     } catch (error) {
         console.error('Error fetching colleges:', error);
