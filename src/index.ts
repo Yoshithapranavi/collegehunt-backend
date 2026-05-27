@@ -284,6 +284,27 @@ const server = createServer(async (req, res) => {
     try {
         const url = new URL(req.url || '/', `http://${req.headers.host}`);
 
+        // CORS handling: allow frontend origin(s) and localhost for dev
+        const allowedOrigins = [
+            'https://yoshithapranavi.github.io',
+            'http://localhost:5173',
+            'http://localhost:3000',
+        ];
+        const requestOrigin = (req.headers.origin as string) || '';
+        const allowOrigin = allowedOrigins.includes(requestOrigin) ? requestOrigin : 'https://yoshithapranavi.github.io';
+
+        if ((req.method || '').toUpperCase() === 'OPTIONS') {
+            // Preflight
+            res.writeHead(204, {
+                'Access-Control-Allow-Origin': allowOrigin,
+                'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+                'Access-Control-Allow-Credentials': 'true',
+            });
+            res.end();
+            return;
+        }
+
         // Read body if present
         let body: any;
         if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method || '')) {
@@ -303,7 +324,14 @@ const server = createServer(async (req, res) => {
 
         const response = await app.fetch(request);
 
-        res.writeHead(response.status, Object.fromEntries(response.headers as any));
+        // Copy response headers and add CORS headers
+        const respHeaders = new Headers(response.headers as any);
+        respHeaders.set('Access-Control-Allow-Origin', allowOrigin);
+        respHeaders.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+        respHeaders.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+        respHeaders.set('Access-Control-Allow-Credentials', 'true');
+
+        res.writeHead(response.status, Object.fromEntries(respHeaders as any));
         res.end(await response.text());
     } catch (error) {
         console.error('Request error:', error);
